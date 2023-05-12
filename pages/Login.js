@@ -30,6 +30,7 @@ const Login = () => {
         const data = {
           _id: user.uid,
           name: user.displayName,
+          email: user.email,
         };
         const db = getFirestore();
         const dbRef = collection(db, "users");

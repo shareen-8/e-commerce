@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { HiOutlineArrowLeft } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { ToastContainer, toast } from "react-toastify";
@@ -6,13 +6,20 @@ import { Link } from "react-router-dom";
 import CartItem from "../components/CartItem";
 import StripeCheckout from "react-stripe-checkout";
 import axios from "axios";
-import { addDoc, collection, getFirestore } from "firebase/firestore";
+
+import {
+  addDoc,
+  collection,
+  getFirestore,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const Cart = () => {
   const productData = useSelector((state) => state.bazar.productData);
   const userInfo = useSelector((state) => state.bazar.userInfo);
   const [payNow, setPayNow] = useState(false);
   const [totalAmt, setTotalAmt] = useState("");
+
   useEffect(() => {
     let price = 0;
     productData.map((item) => {
@@ -22,31 +29,37 @@ const Cart = () => {
     setTotalAmt(price.toFixed(2));
   }, [productData]);
 
-  useEffect(() => {
-    const data = {
-      products: productData.length,
-      name: userInfo.email,
-    };
-    const db = getFirestore();
-    const dbRef = collection(db, "orders");
-
-    addDoc(dbRef, data)
-      .then((docRef) => {
-        console.log("Document has been added successfully");
-      })
-      .catch((error) => {
-        console.log(error);
-      });
-  }, [payNow]);
-
   const handleCheckout = () => {
     if (userInfo) {
       setPayNow(true);
+
+      const data = {
+        createdAt: serverTimestamp(),
+        products: productData.length,
+        email: userInfo.email,
+        totalAmt: totalAmt,
+        quantity: productData.map((item) => {
+          return item.quantity;
+        }),
+        title: productData.map((item) => {
+          return item.title;
+        }),
+      };
+      const db = getFirestore();
+      const dbRef = collection(db, "orders");
+
+      addDoc(dbRef, data)
+        .then((docRef) => {
+          console.log("Document has been added successfully");
+        })
+        .catch((error) => {
+          console.log(error);
+        });
     } else {
       toast.error("Please sign in to Checkout");
     }
   };
-  const payment = async (token) => {
+  const payment = async (token, addressess) => {
     await axios.post("http://localhost:8000/pay", {
       amount: totalAmt * 100,
       token: token,
@@ -94,7 +107,6 @@ const Cart = () => {
             {payNow && (
               <div className="w-full mt-6 flex items-center justify-center">
                 <StripeCheckout
-                  //stripeKey="pk_test_51LXpmzBcfNkwYgIPXd3qq3e2m5JY0pvhaNZG7KSCklYpVyTCVGQATRH8tTWxDSYOnRTT5gxOjRVpUZmOWUEHnTxD00uxobBHkc"
                   stripeKey="pk_test_51MybSVSIJ66Hi8nbe5O0xoP2TYNRniONGl32HLqZv2bAiQuYGMAY6or9b3sreLe6gGPvydjEbIH8lH5iBJIa4jsY00o6Jt8VO5"
                   name="Bazar Online Shopping"
                   amount={totalAmt * 100}
@@ -102,6 +114,8 @@ const Cart = () => {
                   description={`Your Payment amount is $${totalAmt}`}
                   token={payment}
                   email={userInfo.email}
+                  billingAddress
+                  shippingAddress
                 />
               </div>
             )}
